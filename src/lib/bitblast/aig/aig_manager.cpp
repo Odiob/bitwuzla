@@ -39,7 +39,8 @@ void
 AigNodeUniqueTable::insert(AigNodeData* d)
 {
   assert(find(d->d_left.key(), d->d_right.key()) == nullptr);
-  if (d_num_elements == d_buckets.size())
+  // Keep the load factor at most 0.5.
+  if (d_num_elements * 2 >= d_buckets.size())
   {
     resize();
   }
