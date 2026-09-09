@@ -353,7 +353,15 @@ WordBlaster::_word_blast(const Node& node)
 
       if (!is_leaf(cur))
       {
-        visit.insert(visit.end(), cur.begin(), cur.end());
+        for (const Node& child : cur)
+        {
+          const Type& child_type = child.type();
+          if (child_type.is_fp() || child_type.is_rm())
+          {
+            // For non-leafs, only FP/RM children have to be word-blasted.
+            visit.push_back(child);
+          }
+        }
       }
     }
     else if (!visited.at(cur))
