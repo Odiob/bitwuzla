@@ -433,6 +433,10 @@ AbstractionModule::check_term_abstraction(const Node& abstr)
       d_lemma_buffer.emplace_back(node, lemma, lk);
       if (kind == Kind::BV_MUL && val_x == val_s)
       {
+        // We track the number of square value instantiations encountered,
+        // irrespective of whether they are actually added in check(),
+        // to decide below if the special square encoding lemma for BV_MUL
+        // should be added (LemmaKind::BITBLAST_BV_MUL_SQUARE).
         ++d_value_insts_square[node];
       }
     }

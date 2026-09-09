@@ -121,9 +121,22 @@ class AbstractionModule
   /** Stores enabled refinement lemmas based on kind. */
   std::unordered_map<node::Kind, std::vector<std::unique_ptr<AbstractionLemma>>>
       d_abstr_lemmas;
-  /** Maps the number of value instantiations per abstracted term. */
+  /**
+   * Maps the number of value instantiation lemmas added per abstracted term.
+   * @note This tracks the actual number of value instantiation lemmas added
+   *       in check(), which may differ to the number of value instantiation
+   *       lemmas added to d_lemma_buffer in check_term_abstraction().
+   *       We only add these "last resort" lemmas in d_lemma_buffer if no
+   *       tier1-2 refinement lemma was added this refinement round, for any
+   *       abstracted term.
+   */
   std::unordered_map<Node, uint64_t> d_value_insts;
-  /** Number of times a value instantiation was a square multiplication. */
+  /**
+   * Number of times a value instantiation was a square multiplication.
+   * @note This tracks the number of square value instantiation lemmas added to
+   *       d_lemma_buffer, irrespective of whether the lemmas were actually
+   *       added in check() (see above).
+   */
   std::unordered_map<Node, uint64_t> d_value_insts_square;
   /** Stores refined assertions. */
   backtrack::unordered_set<Node> d_assertion_abstractions_cache;
