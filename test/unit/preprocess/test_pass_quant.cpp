@@ -849,4 +849,46 @@ TEST_F(TestPassQuant, alpha_stats)
                 "preprocess::quant::num_alpha_elim"),
             1);
 }
+TEST_F(TestPassQuant, eliminate_cyclic_inverses)
+{
+  d_options.pp_quant_alpha.set(false);
+  sat::SatSolverFactory sat_factory(d_options);
+  Env env(d_nm, sat_factory, d_options);
+  preprocess::pass::PassQuant pass(env, &d_bm);
+
+  Node c = d_nm.mk_const(d_bv2, "c");
+  Node x = d_nm.mk_var(d_bv2, "x");
+  Node y = d_nm.mk_var(d_bv2, "y");
+
+  // (forall x. (forall y. (=> (= (bvadd x y) c) (bvule x c))))
+  // Inverse computation yields an inverse for both variables of the equality,
+  // x = c - y and y = c - x.
+  // If eliminate() is not called on every quantifier, bottom up, but processes
+  // chained quantifiers to avoid quadratic blowup, the substitution map holds a
+  // cyclic substitution, which must be handled safely.
+  Node q = d_nm.mk_node(
+      Kind::FORALL,
+      {x,
+       d_nm.mk_node(
+           Kind::FORALL,
+           {y,
+            d_nm.mk_node(Kind::IMPLIES,
+                         {d_nm.mk_node(Kind::EQUAL,
+                                       {d_nm.mk_node(Kind::BV_ADD, {x, y}), c}),
+                          d_nm.mk_node(Kind::BV_ULE, {x, c})})})});
+
+  d_as.push_back(q);
+  preprocess::AssertionVector assertions(d_as.view());
+  pass.apply(assertions);
+
+  // Exactly one of the two variables is eliminated, the other one stays bound.
+  Node res     = assertions[0];
+  auto binders = collect_binders({res});
+  ASSERT_EQ(binders.size(), 1u);
+  const Node& bound = binders.begin()->first;
+  ASSERT_TRUE(bound == x || bound == y);
+  // The eliminated variable does not occur in the result anymore.
+  ASSERT_FALSE(node::utils::has_x(res, bound == x ? y : x));
+}
+
 }  // namespace bzla::test
