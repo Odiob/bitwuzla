@@ -170,7 +170,7 @@ BvBitblastSolver::solve()
   if (!d_encode_queue.empty())
   {
     util::Timer timer(d_stats.time_encode);
-    for (const auto& [n, is_assertion, is_lemma, level] : d_encode_queue)
+    for (const auto& [n, is_assertion, level, level_encode] : d_encode_queue)
     {
       // The interpolation proof tracer cannot label clauses that contain
       // SAT-level activation literals, so when producing interpolants we
@@ -180,7 +180,7 @@ BvBitblastSolver::solve()
       if (!d_produce_interpolants)
       {
         sync_sat_level(level);
-        enc_level = is_lemma ? d_solver_state.term_level(n) : level;
+        enc_level = level_encode;
       }
       const auto& bits = d_bitblaster.bits(n);
       assert(bits.size() == 1);
@@ -260,10 +260,16 @@ BvBitblastSolver::register_assertion(const Node& assertion,
     }
   }
 
-  d_encode_queue.emplace_back(assertion,
-                              top_level,
-                              is_lemma,
-                              d_solver_state.backtrack_mgr()->num_levels());
+  uint32_t level =
+      static_cast<uint32_t>(d_solver_state.backtrack_mgr()->num_levels());
+  // Lemmas are globally valid, their clauses are only tied to the level their
+  // terms were introduced at. Determine it now, solve() may run at a higher
+  // level.
+  uint32_t level_encode =
+      is_lemma ? d_solver_state.term_level(assertion) : level;
+  assert(level_encode <= level);
+
+  d_encode_queue.emplace_back(assertion, top_level, level, level_encode);
 
   // Update AIG statistics
   update_statistics();
@@ -430,6 +436,7 @@ BvBitblastSolver::register_distinct_n(const Node& node)
     }
     bits.emplace_back(std::move(ids));
   }
+  d_bitblaster.bitblast(node);
   const auto& bit = d_bitblaster.bits(node)[0];
   d_cnf_encoder->encode(bit, false);
   util::Integer card(node[0].value<BitVector>());

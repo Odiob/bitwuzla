@@ -120,11 +120,12 @@ class BvBitblastSolver : public Solver,
   /** The current set of assumptions. */
   backtrack::vector<Node> d_assumptions;
   /**
-   * Queue of (node, is_assertion, is_lemma, level) tuples pending CNF
-   * encoding. Backtrackable, so entries above a popped level are dropped
+   * Queue of (node, is_assertion, level, enc_level) tuples pending CNF
+   * encoding, registered at assertion level `level` and encoded at
+   * `enc_level`. Backtrackable, so entries above a popped level are dropped
    * automatically.
    */
-  backtrack::vector<std::tuple<Node, bool, bool, uint32_t>> d_encode_queue;
+  backtrack::vector<std::tuple<Node, bool, uint32_t, uint32_t>> d_encode_queue;
 
   /** AIG bit-blaster. */
   AigBitblaster d_bitblaster;

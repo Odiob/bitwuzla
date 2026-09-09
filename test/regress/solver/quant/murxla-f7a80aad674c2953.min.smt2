@@ -1,0 +1,8 @@
+(set-logic ALL)
+(declare-const _x0 Bool)
+(declare-const _x3 Bool)
+(assert (not (distinct _x0 (not (exists ((_x4 Bool)) (distinct _x0 _x3))))))
+(set-info :status sat)
+(check-sat)
+(set-info :status unsat)
+(check-sat-assuming ((distinct _x0 (not (exists ((_x4 Bool)) (distinct _x0 _x3)))) _x3))

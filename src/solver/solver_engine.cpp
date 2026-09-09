@@ -496,6 +496,9 @@ SolverEngine::process_assertion(const Node& assertion,
   Node _assertion =
       d_am ? d_am->process_assertion(assertion, is_lemma) : assertion;
 
+  // Register terms first, register_assertion() needs their assertion levels.
+  process_term(_assertion);
+
   // Send assertion to bit-vector solver.
   auto [it, inserted] = d_register_assertion_cache.insert(_assertion);
   if (inserted)
@@ -504,7 +507,6 @@ SolverEngine::process_assertion(const Node& assertion,
     d_bv_solver.register_assertion(_assertion, top_level, is_lemma);
     d_quant_solver.register_assertion(_assertion);
   }
-  process_term(_assertion);
 }
 
 void
@@ -923,7 +925,9 @@ SolverEngine::term_level(const Node& term)
     }
     // All children are computed, the level is the maximum over the children's
     // levels. Leaf terms that are not values take the assertion level at which
-    // they were first registered (top level if not registered).
+    // they were first registered. Terms below theory leaves are not registered
+    // and take the current level, which is correct since term levels are
+    // determined right after registering an assertion's terms.
     uint32_t level = 0;
     for (const auto& c : cur)
     {
