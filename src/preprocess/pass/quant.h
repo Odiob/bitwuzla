@@ -11,6 +11,8 @@
 #ifndef BZLA_PREPROCESS_PASS_QUANT_H_INCLUDED
 #define BZLA_PREPROCESS_PASS_QUANT_H_INCLUDED
 
+#include <cstdlib>
+
 #include "backtrack/unordered_set.h"
 #include "preprocess/preprocessing_pass.h"
 #include "solver/bv/bv_inverter.h"

@@ -73,7 +73,9 @@ PassQuant::process(const Node& node)
 {
   NodeManager& nm    = d_env.nm();
   Rewriter& rewriter = d_env.rewriter();
+
   node_ref_vector visit{node};
+  std::unordered_set<Node> inner_quants;
 
   do
   {
@@ -82,6 +84,11 @@ PassQuant::process(const Node& node)
 
     if (inserted)
     {
+      if (cur.kind() == Kind::FORALL && cur[1].kind() == Kind::FORALL)
+      {
+        inner_quants.insert(cur[1]);
+      }
+
       visit.insert(visit.end(), cur.begin(), cur.end());
       continue;
     }
@@ -106,21 +113,24 @@ PassQuant::process(const Node& node)
           //       binder that keeps the original variable.
           Node fresh_var = mk_fresh_var(nm, cur[0]);
           d_bound_vars.insert(fresh_var.id());
-          res            = uniquify_variable(cur, fresh_var);
+          res = uniquify_variable(cur, fresh_var);
           assert(!res.is_null());
           assert(res.kind() == Kind::FORALL);
           assert(cur != node || !has_free_vars(res).first);
         }
       }
 
-      if (res.kind() == Kind::FORALL)
+      // We do not call eliminate on each quantifier in a chain, bottom up, but
+      // process such chains in batch in eliminate(). This avoids quadratic
+      // overhead on quantifiers with large prefix.
+      if (res.kind() == Kind::FORALL
+          && inner_quants.find(cur) == inner_quants.end())
       {
         Node elim = eliminate(res);
         if (elim != res)
         {
           assert(!elim.is_null());
           res = elim;
-          ++d_stats.num_inv_elim;
         }
       }
       it->second = res;
@@ -375,6 +385,41 @@ PassQuant::find_inverse(const Node& body, const Node& var, bool negated)
   return Node();
 }
 
+namespace {
+/**
+ * Determine which variables in `vars` occur in `node`.
+ * @param node The node to check.
+ * @param vars The variables to check for.
+ * @return The set of variables that occur in `node`.
+ */
+std::vector<Node>
+collect_vars(const Node& node, const std::unordered_set<Node>& vars)
+{
+  std::vector<Node> res;
+  std::unordered_set<Node> cache;
+  node_ref_vector visit{node};
+  do
+  {
+    const Node& cur = visit.back();
+    visit.pop_back();
+    if (!cache.insert(cur).second)
+    {
+      continue;
+    }
+    if (cur.kind() == Kind::VARIABLE)
+    {
+      if (vars.find(cur) != vars.end())
+      {
+        res.push_back(cur);
+      }
+      continue;
+    }
+    visit.insert(visit.end(), cur.begin(), cur.end());
+  } while (!visit.empty());
+  return res;
+}
+}  // namespace
+
 Node
 PassQuant::eliminate(const Node& node)
 {
@@ -382,14 +427,8 @@ PassQuant::eliminate(const Node& node)
 
   assert(node.kind() == Kind::FORALL);
 
-  const Node& var = node[0];
-  Node body = node[1];
-  std::vector<Node> quants;
-  while (body.kind() == Kind::FORALL)
-  {
-    quants.push_back(body[0]);
-    body = body[1];
-  }
+  NodeManager& nm    = d_env.nm();
+  Rewriter& rewriter = d_env.rewriter();
 
   // Given a formula (forall x. (or (not A) B)), if we find a non-negated
   // equality a = b in A (where x appears in either a or b) and can derive an
@@ -402,22 +441,153 @@ PassQuant::eliminate(const Node& node)
   //
   // Hence, when trying to find such equalities, we start with negated = true.
   // Note: find_inverse() also handles the common DER case for non-BV vars.
-  Node inv = find_inverse(body, var);
-  if (inv.is_null())
+  //
+  // For deep quantifier chains, we get a quadratic overhead if eliminate()
+  // processes each quantifier sequentially. Thus, we process such chains in
+  // batch, and substitute all quantified variables that can be eliminated
+  // at once. Note that processing in batch can result in cyclic substitutions,
+  // hence we process in rounds and break such cycles by deferring all but one
+  // (for each cycle) to later rounds.
+
+  std::vector<Node> vars;
+  std::unordered_set<Node> eliminated;
+  Node body = node;
+
+  while (body.kind() == Kind::FORALL)
+  {
+    vars.push_back(body[0]);
+    body = body[1];
+  }
+
+  for (;;)
+  {
+    std::vector<std::pair<Node, Node>> inverses;  // innermost variable first
+    std::unordered_set<Node> candidates;
+    for (size_t i = 0, n = vars.size(); i < n; ++i)
+    {
+      const Node& var = vars[n - i - 1];
+      if (eliminated.find(var) != eliminated.end())
+      {
+        continue;
+      }
+      Node inv = find_inverse(body, var);
+      if (!inv.is_null())
+      {
+        assert(!utils::has_x(inv, var));
+        inverses.emplace_back(var, inv);
+        candidates.insert(var);
+      }
+    }
+    if (inverses.empty())
+    {
+      break;
+    }
+
+    // An inverse may reference other candidate variables, e.g., an equality
+    // (= (bvadd x y) t) yields an inverse for both x and y, which may result
+    // in a cyclic substition map, but it must be acyclic (utils::substitute()
+    // also substitutes in the substituted terms).
+    //
+    // We break such cycles by determining the dependencies between the
+    // elimination candidates and deferring the source of every back edge
+    // found by a depth-first search over the resulting graph to the next round.
+    // This is guaranteed to hit every cycle.
+    //
+    // Deferred candidates are eliminated in one of the next rounds, where
+    // their inverse is recomputed w.r.t. the substituted body.
+    std::unordered_map<Node, std::vector<Node>> deps;
+    for (const auto& [var, inv] : inverses)
+    {
+      assert(deps.find(var) == deps.end());
+      deps[var] = collect_vars(inv, candidates);
+    }
+
+    std::unordered_set<Node> dropped;
+    // Marks for processing status: 0: unvisited, 1: open, 2: done
+    std::unordered_map<Node, uint8_t> marked;
+    // Visit stack, maps nodes to be visited to the next deps index to process.
+    // Note: We cannot process deps per node sequentially, we must process them
+    //       in strict DFS order. The visit stack faciliates this.
+    std::vector<std::pair<Node, size_t>> visit;
+    for (const auto& p : inverses)
+    {
+      const Node& cur     = p.first;
+      auto [it, inserted] = marked.emplace(cur, 0);
+      if (!inserted)
+      {
+        assert(it->second == 2);
+        continue;
+      }
+      it->second = 1;
+
+      visit.emplace_back(cur, 0);
+      do
+      {
+        auto& [ccur, idx]     = visit.back();
+        const auto& ccur_deps = deps.at(ccur);
+        if (idx == ccur_deps.size() || dropped.find(ccur) != dropped.end())
+        {
+          assert(marked.find(ccur) != marked.end());
+          marked[ccur] = 2;
+          visit.pop_back();
+          continue;
+        }
+        const Node& dep = ccur_deps[idx++];
+        if (dropped.find(dep) != dropped.end())
+        {
+          continue;
+        }
+        auto [itm, _] = marked.emplace(dep, 0);
+        if (itm->second == 1)
+        {
+          // Back edge, break the cycle by not eliminating `ccur`. Note that
+          // this keeps the candidate that comes first in the (innermost
+          // variable first) elimination order.
+          dropped.insert(ccur);
+        }
+        else if (itm->second == 0)
+        {
+          itm->second = 1;
+          visit.emplace_back(dep, 0);
+        }
+      } while (!visit.empty());
+    }
+
+    std::unordered_map<Node, Node> substs;
+    for (const auto& [var, inv] : inverses)
+    {
+      if (dropped.find(var) == dropped.end())
+      {
+        substs.emplace(var, inv);
+      }
+    }
+    assert(!substs.empty());
+    {
+      util::Timer timer_inv_elim_subst(d_stats.time_inv_elim_subst);
+      std::unordered_map<Node, Node> cache;
+      body = rewriter.rewrite(utils::substitute(nm, body, substs, cache));
+    }
+    d_stats.num_inv_elim += substs.size();
+    for (const auto& [var, inv] : substs)
+    {
+      eliminated.insert(var);
+    }
+  }
+
+  if (eliminated.empty())
   {
     return node;
   }
-  assert(!utils::has_x(inv, var));
-  util::Timer timer_inv_elim_subst(d_stats.time_inv_elim_subst);
-  std::unordered_map<Node, Node> substs{{var, inv}};
-  std::unordered_map<Node, Node> cache;
-  NodeManager& nm = d_env.nm();
-  Node res        = utils::substitute(nm, body, substs, cache);
-  for (auto it = quants.rbegin(); it != quants.rend(); ++it)
+  Node res = body;
+  for (auto it = vars.rbegin(); it != vars.rend(); ++it)
   {
+    if (eliminated.find(*it) != eliminated.end())
+    {
+      continue;
+    }
     res = nm.mk_node(Kind::FORALL, {*it, res});
   }
-  return d_env.rewriter().rewrite(res);
+  return rewriter.rewrite(res);
 }
 
 Node

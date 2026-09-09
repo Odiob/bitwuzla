@@ -1,0 +1,5 @@
+(set-logic BV)
+(declare-const t (_ BitVec 8))
+(assert (forall ((x (_ BitVec 8))) (forall ((y (_ BitVec 8))) (= t (bvadd x y)))))
+(check-sat)
+(exit)
