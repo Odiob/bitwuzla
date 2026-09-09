@@ -125,6 +125,12 @@ struct KindInfo
     return kind == Kind::EXISTS || kind == Kind::FORALL;
   }
 
+  /** @return Whether given kind binds a variable in its second child. */
+  static bool is_binder(Kind kind)
+  {
+    return is_quant(kind) || kind == Kind::LAMBDA;
+  }
+
   constexpr KindInfo();
 
   /** Are all kinds initialized? */

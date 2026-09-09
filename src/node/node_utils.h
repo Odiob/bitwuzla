@@ -12,6 +12,7 @@
 #define BZLA_NODE_NODE_UTILS_H_INCLUDED
 
 #include <unordered_map>
+#include <unordered_set>
 
 #include "node/node.h"
 
@@ -31,6 +32,41 @@ bool is_bv_sext(const Node& node, Node& child);
  * @param x    The node to check for.
  */
 bool has_x(const Node& node, const Node& x);
+
+/**
+ * Determine the free variables of the given node.
+ *
+ * Free variables are determined bottom up per node, i.e., independently of
+ * where a node occurs. Collecting all variables bound anywhere in `node` into
+ * a single set instead considers a variable bound even if it also occurs free
+ * in `node`, which is the case whenever the same variable node is bound at two
+ * nested levels.
+ *
+ * @param node The node to determine the free variables of.
+ * @param fvs  Output parameter. The free variables are inserted into this set,
+ *             it is not cleared.
+ * @return True if the node has free variables.
+ */
+bool free_vars(const Node& node, std::unordered_set<Node>* fvs = nullptr);
+
+/**
+ * Determine the free variables of the given node, reusing the given cache.
+ *
+ * The free variables of a node never change, thus the cache stays valid and
+ * may be shared across calls. Pass the same cache when querying nodes that
+ * share subterms, e.g., the assertions of a formula, to avoid traversing the
+ * shared subterms once per query.
+ *
+ * @param node  The node to determine the free variables of.
+ * @param fvs   Output parameter. The free variables are inserted into this
+ *              set, it is not cleared.
+ * @param cache Maps a node to its free variables. A node present in the cache
+ *              is fully computed, its set of free variables may be empty.
+ * @return True if the node has free variables.
+ */
+bool free_vars(const Node& node,
+               std::unordered_set<Node>* fvs,
+               std::unordered_map<Node, std::unordered_set<Node>>& cache);
 
 /**
  * @return n-ary node of given kind.

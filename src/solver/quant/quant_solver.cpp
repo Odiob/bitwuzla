@@ -571,55 +571,6 @@ QuantSolver::is_expensive(const Node& node) const
   return false;
 }
 
-namespace {
-/**
- * Collect the free variables of `node` into `fvs`.
- * @param node The node.
- * @param fvs  Output parameter. The free variables of `node`.
- * @return True if the node has free variables.
- */
-bool
-free_vars(const Node& node, std::unordered_set<Node>* fvs = nullptr)
-{
-  bool res = false;
-  std::unordered_set<Node> quants;
-  std::vector<Node> vars;
-  std::vector<Node> visit{node};
-  std::unordered_set<Node> cache;
-  do
-  {
-    auto cur = visit.back();
-    visit.pop_back();
-    auto [it, inserted] = cache.emplace(cur);
-    if (inserted)
-    {
-      if (cur.kind() == Kind::VARIABLE)
-      {
-        vars.push_back(cur);
-      }
-      else if (cur.kind() == Kind::FORALL)
-      {
-        quants.insert(cur[0]);
-      }
-      visit.insert(visit.end(), cur.begin(), cur.end());
-    }
-  } while (!visit.empty());
-  for (const auto& v : vars)
-  {
-    if (quants.find(v) == quants.end())
-    {
-      if (!fvs)
-      {
-        return true;
-      }
-      res = true;
-      fvs->insert(v);
-    }
-  }
-  return res;
-}
-}  // namespace
-
 void
 QuantSolver::mbqi_lemma(
     const Node& q,
@@ -738,7 +689,7 @@ QuantSolver::mbqi_lemma(
   // This is mainly to document that this can never happen since we ensure
   // in inverse_term() that we use an inverse as is only under safe conditions,
   // and else introduce a fresh constant that the variable is mapped to.
-  assert(!free_vars(lem));
+  assert(!utils::free_vars(lem));
   lemma(lem, lemma_kind);
 }
 
@@ -974,10 +925,10 @@ QuantSolver::inverse_term(const Node& q,
         // a cyclic system of constraints over their fresh instantiation
         // constants, which is potentially unsatisfiable and thus unsound to
         // assert.
-        bool has_fvs = free_vars(invert, &deps);
+        bool has_fvs = utils::free_vars(invert, &deps);
         for (const auto& c : conds)
         {
-          free_vars(c, &deps);
+          utils::free_vars(c, &deps);
         }
         conditions.insert(conditions.end(), conds.begin(), conds.end());
         // We only use an inverse as-is if it does not contain free variables

@@ -96,6 +96,84 @@ has_x(const Node& node, const Node& x)
   return false;
 }
 
+namespace {
+
+/**
+ * Compute the free variables of `node` and all of its subterms into `cache`.
+ * Nodes already present in `cache` are fully computed and not traversed again,
+ * which is what makes sharing a cache across calls worthwhile.
+ */
+void
+compute_free_vars(const Node& node,
+                  std::unordered_map<Node, std::unordered_set<Node>>& cache)
+{
+  std::unordered_map<Node, bool> visited;
+  node_ref_vector visit{node};
+  do
+  {
+    const Node& cur = visit.back();
+
+    if (cache.find(cur) != cache.end())
+    {
+      visit.pop_back();
+      continue;
+    }
+
+    auto [it, inserted] = visited.emplace(cur, false);
+    if (inserted)
+    {
+      visit.insert(visit.end(), cur.begin(), cur.end());
+      continue;
+    }
+    else if (!it->second)
+    {
+      it->second = true;
+      std::unordered_set<Node> vars;
+      if (cur.kind() == Kind::VARIABLE)
+      {
+        vars.insert(cur);
+      }
+      else
+      {
+        for (const Node& child : cur)
+        {
+          const auto& child_vars = cache.at(child);
+          vars.insert(child_vars.begin(), child_vars.end());
+        }
+        if (KindInfo::is_binder(cur.kind()))
+        {
+          vars.erase(cur[0]);
+        }
+      }
+      cache.emplace(cur, std::move(vars));
+    }
+    visit.pop_back();
+  } while (!visit.empty());
+}
+
+}  // namespace
+
+bool
+free_vars(const Node& node,
+          std::unordered_set<Node>* fvs,
+          std::unordered_map<Node, std::unordered_set<Node>>& cache)
+{
+  compute_free_vars(node, cache);
+  const auto& vars = cache.at(node);
+  if (fvs)
+  {
+    fvs->insert(vars.begin(), vars.end());
+  }
+  return !vars.empty();
+}
+
+bool
+free_vars(const Node& node, std::unordered_set<Node>* fvs)
+{
+  std::unordered_map<Node, std::unordered_set<Node>> cache;
+  return free_vars(node, fvs, cache);
+}
+
 Node
 mk_nary(NodeManager& nm, Kind kind, const std::vector<Node>& terms)
 {

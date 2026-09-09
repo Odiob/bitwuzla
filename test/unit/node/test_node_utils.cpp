@@ -221,4 +221,44 @@ TEST_F(TestNodeUtils, next_value)
   }
 }
 
+TEST_F(TestNodeUtils, free_vars)
+{
+  Type bool_type = d_nm.mk_bool_type();
+  Node x         = d_nm.mk_var(bool_type, "x");
+  Node y         = d_nm.mk_var(bool_type, "y");
+
+  // A bare variable is free, a constant is not.
+  ASSERT_TRUE(utils::free_vars(x));
+  ASSERT_FALSE(utils::free_vars(d_a));
+
+  // A quantifier binds its variable.
+  Node all_x =
+      d_nm.mk_node(Kind::FORALL, {x, d_nm.mk_node(Kind::AND, {x, d_a})});
+  ASSERT_FALSE(utils::free_vars(all_x));
+
+  // Only the bound variable is bound, y stays free.
+  Node all_x_y =
+      d_nm.mk_node(Kind::FORALL, {x, d_nm.mk_node(Kind::AND, {x, y})});
+  std::unordered_set<Node> fvs;
+  ASSERT_TRUE(utils::free_vars(all_x_y, &fvs));
+  ASSERT_EQ(fvs, std::unordered_set<Node>{y});
+
+  // x occurs both free and bound: it must be reported free. Determining the
+  // bound variables of the whole term in one set would consider it bound.
+  Node mixed = d_nm.mk_node(Kind::AND, {x, all_x});
+  fvs.clear();
+  ASSERT_TRUE(utils::free_vars(mixed, &fvs));
+  ASSERT_EQ(fvs, std::unordered_set<Node>{x});
+
+  // The same variable node bound at two nested levels is still closed.
+  Node nested = d_nm.mk_node(Kind::FORALL, {x, all_x});
+  ASSERT_FALSE(utils::free_vars(nested));
+
+  // `fvs` accumulates across calls and is not cleared.
+  fvs.clear();
+  utils::free_vars(x, &fvs);
+  utils::free_vars(y, &fvs);
+  ASSERT_EQ(fvs.size(), 2);
+}
+
 }  // namespace bzla::test
