@@ -73,8 +73,8 @@ class BvInverter
       const std::unordered_map<Node, size_t>& path);
 
   /**
-   * Compute the invertibility condition for a given node with respect to
-   * t and x = node[idx].
+   * Compute the invertibility condition (IC) for a given node with respect to
+   * `t` (i.e., (= node t)) and x = node[idx].
    * @param node The node.
    * @param t    The t node.
    * @param idx  The idx of x.
@@ -104,21 +104,90 @@ class BvInverter
    */
   Node inverse(const Node& node, size_t idx, const Node& t);
 
-  std::pair<Node, Node> ic(const Node& node,
-                           size_t idx,
-                           const std::unordered_map<Node, size_t>& path,
-                           bool negate);
-  std::pair<Node, Node> ic(node::Kind predicate,
-                           const Node& node,
-                           size_t idx,
-                           const Node& t,
-                           const std::unordered_map<Node, size_t>& path);
+  /**
+   * Compute the invertibility condition (IC) for a predicate w.r.t. operand
+   * x = node[idx_x] of a given node.
+   *
+   * This computes the IC for P[x] = (<predicate> node t) if `idx` is 0, and
+   * for (<predicate> t node) if `idx` is 1. That is, the resulting condition
+   * is satisfied exactly when the predicate is solvable for x, i.e., it is
+   * equivalent to (exists x. P[x]).
+   *
+   * @note If `node` is x itself, `idx_x` is ignored. If it is a bit-vector
+   *       inequality, then `predicate` must be Kind::EQUAL as inequalities
+   *       are only reachable via equalities on the path when chaining inverses
+   *       in invert().
+   *
+   * @note Assumes that x occurs in neither s = node[1 - idx_x] nor `t`. The
+   *       resulting condition is a formula over s and `t`, thus callers that
+   *       pass a `t` containing x must check the result for occurrences of x.
+   *
+   * The ICs computed here and in the ic_*() functions this dispatches to are
+   * given in Tables 3-7 of:
+   *
+   *   A. Niemetz, M. Preiner, A. Reynolds, C. Barrett, C. Tinelli. On Solving
+   *   Quantified Bit-Vector Constraints using Invertibility Conditions.
+   *   Formal Methods in System Design 57(2), 2021.
+   *
+   * @param predicate The predicate.
+   * @param node      The node containing x. Its kind must be invertible, see
+   *                  is_invertible().
+   * @param t         The other operand of the predicate.
+   * @param idx       The index at which `node` occurs in the predicate.
+   * @param idx_x     The index of x in `node`.
+   * @return The invertibility condition.
+   */
   Node ic(node::Kind predicate,
           const Node& node,
           const Node& t,
           size_t idx,
           size_t idx_x);
 
+  /**
+   * Get invertibility condition (IC) for a given predicate node w.r.t. x, along
+   * with the subterm of the node the condition was computed for.
+   *
+   * This computes the IC for `node` if `negate` is false, and for its negation
+   * otherwise. Since ICs are defined for a single operator application, this
+   * descends at most one level below `node`.
+   *
+   * The returned subterm is the term the condition was computed for, i.e.,
+   * the term that invert() abstracts as a fresh constant in the corresponding
+   * choice condition, and from which it continues the inversion chain.
+   *
+   * @param node   The node
+   * @param idx    The index of the operand of `node` that contains x, i.e.,
+   *               path.at(node).
+   * @param path   The path from `node` to x, see compute_path().
+   * @param negate True to compute the IC for the negation of `node`.
+   * @return A pair of the invertibility condition and the subterm of `node`
+   *         it was computed for.
+   */
+  std::pair<Node, Node> ic(const Node& node,
+                           size_t idx,
+                           const std::unordered_map<Node, size_t>& path,
+                           bool negate);
+  /**
+   * Helper for ic() above.
+   *
+   * Get invertibility condition (IC) for a predicate w.r.t. the operand of a
+   * given node on a given path, along with that operand.
+   *
+   * Same as ic(predicate, node, t, idx, idx_x) with idx_x = path.at(node).
+   *
+   * @param predicate The predicate <p>.
+   * @param node      The node containing x. Must occur on `path`.
+   * @param idx       The index at which `node` occurs in the predicate.
+   * @param t         The other operand of the predicate.
+   * @param path      The path to x, see compute_path().
+   * @return A pair of the invertibility condition and the operand of `node`
+   *         that contains x.
+   */
+  std::pair<Node, Node> ic(node::Kind predicate,
+                           const Node& node,
+                           size_t idx,
+                           const Node& t,
+                           const std::unordered_map<Node, size_t>& path);
   /**
    * Get invertibility condition (IC) for a predicate w.r.t. an AND node.
    *
