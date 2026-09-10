@@ -409,7 +409,7 @@ TestBvInverter::check_inverse(const Node& node,
   // undetermined when the invertibility condition is false (the conditions
   // are encoded over implications IC => predicate), hence no validity check
   // is performed here. The satisfiability of the conditions themselves is
-  // checked in check_conds_satisfiable().
+  // checked in check_conds().
 }
 
 /* -------------------------------------------------------------------------- */
