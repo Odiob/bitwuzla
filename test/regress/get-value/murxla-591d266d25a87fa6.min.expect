@@ -1,0 +1,10 @@
+sat
+(
+  (((_ fp.to_sbv 8) RTZ f) #b00000011)
+  (((_ fp.to_ubv 8) RTZ f) #b00000011)
+)
+sat
+(
+  (((_ fp.to_sbv 8) RTZ f) #b00000011)
+  (((_ fp.to_ubv 8) RTZ f) #b00000011)
+)

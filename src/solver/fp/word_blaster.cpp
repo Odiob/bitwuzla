@@ -125,13 +125,6 @@ WordBlaster::is_word_blasted(const Node& node) const
 {
   node::Kind kind = node.kind();
 
-  // We never call is_word_blasted on partial operators we have already
-  // word-blasted.
-  assert(kind != node::Kind::FP_TO_SBV
-         || d_internal->d_sbv_map.find(node) == d_internal->d_sbv_map.end());
-  assert(kind != node::Kind::FP_TO_UBV
-         || d_internal->d_ubv_map.find(node) == d_internal->d_ubv_map.end());
-
   {
     auto it = d_internal->d_packed_float_map.find(node);
     if (it != d_internal->d_packed_float_map.end())
@@ -151,6 +144,24 @@ WordBlaster::is_word_blasted(const Node& node) const
   {
     auto it = d_internal->d_rm_map.find(node);
     if (it != d_internal->d_rm_map.end())
+    {
+      return true;
+    }
+  }
+  // Partial operators are word-blasted on demand, e.g., when computing their
+  // value, and thus may already be word-blasted when queried again.
+  if (kind == node::Kind::FP_TO_SBV)
+  {
+    auto it = d_internal->d_sbv_map.find(node);
+    if (it != d_internal->d_sbv_map.end())
+    {
+      return true;
+    }
+  }
+  if (kind == node::Kind::FP_TO_UBV)
+  {
+    auto it = d_internal->d_ubv_map.find(node);
+    if (it != d_internal->d_ubv_map.end())
     {
       return true;
     }

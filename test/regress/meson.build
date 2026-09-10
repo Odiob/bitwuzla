@@ -48,6 +48,7 @@ tests_smt2 = [
   ['get-value/fp_rational.smt2'],
   ['get-value/fp_real.smt2'],
   ['get-value/fp_regr9.smt2'],
+  ['get-value/murxla-591d266d25a87fa6.min.smt2'],
   ## options
   ['options/set_option_bool_value_case.smt2'],
   ['options/time_limit_out_of_range.smt2', ['-t', '99999999999999999999999']],
