@@ -129,6 +129,7 @@ class BvInverter
    * @param node      The AND node.
    * @param t         The right-hand-side of the predicate.
    * @param idx_x     The index of x.
+   * @return The invertibility condition.
    */
   Node ic_and(node::Kind predicate,
               const Node& node,
@@ -144,6 +145,7 @@ class BvInverter
    * @param node      The OR node.
    * @param t         The right-hand-side of the predicate.
    * @param idx_x     The index of x.
+   * @return The invertibility condition.
    */
   Node ic_or(node::Kind predicate,
              const Node& node,
@@ -159,6 +161,7 @@ class BvInverter
    * @param node      The BV_AND node.
    * @param t         The right-hand-side of the predicate.
    * @param idx_x     The index of x.
+   * @return The invertibility condition.
    */
   Node ic_bv_and(node::Kind predicate,
                  const Node& node,
@@ -174,6 +177,7 @@ class BvInverter
    * @param node      The BV_OR node.
    * @param t         The right-hand-side of the predicate.
    * @param idx_x     The index of x.
+   * @return The invertibility condition.
    */
   Node ic_bv_or(node::Kind predicate,
                 const Node& node,
@@ -189,6 +193,7 @@ class BvInverter
    * @param node      The BV_ASHR node.
    * @param t         The right-hand-side of the predicate.
    * @param idx_x     The index of x.
+   * @return The invertibility condition.
    */
   Node ic_bv_ashr(node::Kind predicate,
                   const Node& node,
@@ -204,6 +209,7 @@ class BvInverter
    * @param node      The BV_CONCAT node.
    * @param t         The right-hand-side of the predicate.
    * @param idx_x     The index of x.
+   * @return The invertibility condition.
    */
   Node ic_bv_concat(node::Kind predicate,
                     const Node& t,
@@ -219,6 +225,7 @@ class BvInverter
    * @param node      The BV_MUL node.
    * @param t         The right-hand-side of the predicate.
    * @param idx_x     The index of x.
+   * @return The invertibility condition.
    */
   Node ic_bv_mul(node::Kind predicate,
                  const Node& node,
@@ -236,6 +243,7 @@ class BvInverter
    * @param node      The BV_SIGN_EXTEND node.
    * @param t         The right-hand-side of the predicate.
    * @param idx_x     The index of x.
+   * @return The invertibility condition.
    */
   Node ic_bv_sext(node::Kind predicate,
                   const Node& node,
@@ -251,6 +259,7 @@ class BvInverter
    * @param node      The BV_SHL node.
    * @param t         The right-hand-side of the predicate.
    * @param idx_x     The index of x.
+   * @return The invertibility condition.
    */
   Node ic_bv_shl(node::Kind predicate,
                  const Node& node,
@@ -266,6 +275,7 @@ class BvInverter
    * @param node      The BV_SHR node.
    * @param t         The right-hand-side of the predicate.
    * @param idx_x     The index of x.
+   * @return The invertibility condition.
    */
   Node ic_bv_shr(node::Kind predicate,
                  const Node& node,
@@ -281,6 +291,7 @@ class BvInverter
    * @param node      The BV_UDIV node.
    * @param t         The right-hand-side of the predicate.
    * @param idx_x     The index of x.
+   * @return The invertibility condition.
    */
   Node ic_bv_udiv(node::Kind predicate,
                   const Node& node,
@@ -296,6 +307,7 @@ class BvInverter
    * @param node      The BV_UREM node.
    * @param t         The right-hand-side of the predicate.
    * @param idx_x     The index of x.
+   * @return The invertibility condition.
    */
   Node ic_bv_urem(node::Kind predicate,
                   const Node& node,
