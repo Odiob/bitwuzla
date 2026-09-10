@@ -983,6 +983,7 @@ tests_smt2 = [
   ['solver/array/murxla-427525976e8e6eb7.min.smt2'],
   ['solver/array/murxla-760710e825911a1d.min.smt2'],
   ['solver/array/murxla-770ce6d7185508ca.min.smt2'],
+  ['solver/array/murxla-7736091e10681d10.min.smt2'],
   ['solver/array/murxla-7753b69be3012d8d.min.smt2'],
   ['solver/array/murxla-8db24cf7560fd603.min.smt2'],
   ['solver/array/murxla-a6a07f5a1c9fcf82.min.smt2'],

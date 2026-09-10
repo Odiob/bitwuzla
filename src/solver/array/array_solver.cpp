@@ -1179,6 +1179,13 @@ ArraySolver::construct_model_value(const Node& array,
 
     auto it = d_array_models.find(cur);
     std::unordered_map<Node, std::unordered_set<Node>> const_arrays;
+#ifndef NDEBUG
+    // Index/element map of the accesses on the base array `cur`, for the
+    // constant array default value asserts below. These elements have to agree
+    // with the default values below.
+    const bool scalar_element = !cur.type().array_element().is_array();
+    std::map<Node, Node> base_values;
+#endif
     if (it != d_array_models.end())
     {
       for (const auto acc : it->second)
@@ -1223,6 +1230,14 @@ ArraySolver::construct_model_value(const Node& array,
         }
         Node index           = d_solver_state.value(acc->index());
         auto [itm, inserted] = map.emplace(index, Node());
+#ifndef NDEBUG
+        if (scalar_element)
+        {
+          // Record accesses to the base array.
+          base_values.emplace(index,
+                              construct_element_value(acc->element(), cache));
+        }
+#endif
         if (inserted)
         {
           itm->second = construct_element_value(acc->element(), cache);
@@ -1280,12 +1295,12 @@ ArraySolver::construct_model_value(const Node& array,
       // there should not be any overlap of default values, i.e., a
       // missing index has two different default values.
       //
-      // Array-typed element defaults are compared by node identity here, which
-      // doesn't capture model equality (e.g. a STORE chain vs. an equivalent
-      // constant array), so the consistency asserts below only hold for scalar
-      // defaults; the constructed model is validated by --check-model anyway.
-      // For example, <1>(00->0)(01->0) and <0>(11->1)(10->1) are equal, but
-      // not the same nodes.
+      // Array-typed element defaults would be compared by node identity,
+      // which doesn't capture model equality (e.g. a STORE chain vs. an
+      // equivalent constant array), hence the consistency asserts below are
+      // limited to scalar defaults; the constructed model is validated by
+      // --check-model anyway. For example, <1>(00->0)(01->0) and
+      // <0>(11->1)(10->1) are equal, but not the same nodes.
       default_value = d_solver_state.value(dca[0]);
       for (const auto& [ca, updated_indices] : const_arrays)
       {
@@ -1298,23 +1313,27 @@ ArraySolver::construct_model_value(const Node& array,
         {
           if (updated_indices.find(idx) == updated_indices.end())
           {
-            assert(array.type().array_element().is_array()
-                   || map.find(idx) == map.end()
-                   || map.find(idx)->second == dv);
+            assert(!scalar_element || base_values.find(idx) == base_values.end()
+                   || base_values.find(idx)->second == dv);
             map.emplace(idx, dv);
+#ifndef NDEBUG
+            if (scalar_element)
+            {
+              base_values.emplace(idx, dv);
+            }
+#endif
           }
         }
       }
 #ifndef NDEBUG
       {
-        const auto& updated_indices = const_arrays[dca];
+        const auto& updated_indices = const_arrays.at(dca);
         for (const auto& idx : all_indices)
         {
           if (updated_indices.find(idx) == updated_indices.end())
           {
-            assert(array.type().array_element().is_array()
-                   || map.find(idx) == map.end()
-                   || map.find(idx)->second == default_value);
+            assert(!scalar_element || base_values.find(idx) == base_values.end()
+                   || base_values.find(idx)->second == default_value);
           }
         }
       }
