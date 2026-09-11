@@ -1,0 +1,6 @@
+(set-option :global-declarations true)
+(set-option :abstraction-ite true)
+(set-info :status sat)
+(declare-const _x1 (_ FloatingPoint 15 113))
+(declare-const _x2 (Array (_ FloatingPoint 15 113) (_ FloatingPoint 15 113)))
+(check-sat-assuming ( (let ((_let0 (select _x2 (select _x2 _x1))))(fp.gt _let0 (select _x2 _let0)))))

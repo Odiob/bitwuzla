@@ -42,6 +42,15 @@ class AbstractionModule
   /** Process term and abstract relevant terms. */
   const Node& process(const Node& term);
 
+  /**
+   * Map a term into the current abstraction for a value query.
+   *
+   * Like process(), but reuses existing abstractions only. Creating an
+   * abstraction here would introduce a term that is unconstrained in the
+   * current candidate model.
+   */
+  Node process_value(const Node& term);
+
   /** Process assertion and abstract relevant terms. */
   const Node& process_assertion(const Node& assertion, bool is_lemma);
 
@@ -116,6 +125,12 @@ class AbstractionModule
   backtrack::vector<Node> d_active_assertion_abstractions;
   /** Cache for process(). */
   std::unordered_map<Node, Node> d_abstraction_cache;
+  /** Cache for process_value(), invalidated when new abstractions appear. */
+  std::unordered_map<Node, Node> d_value_cache;
+  /** Number of abstractions the value cache was populated with. */
+  uint64_t d_value_cache_num_abstractions = 0;
+  /** Number of created term abstractions. */
+  uint64_t d_num_abstractions = 0;
   /** Assertion cache, used for tracking unsat cores. */
   std::unordered_map<Node, Node> d_abstraction_cache_assertions;
   /** Stores enabled refinement lemmas based on kind. */

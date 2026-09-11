@@ -895,6 +895,8 @@ tests_smt2 = [
   ['solver/abstract/murxla-a2f5f3aa83d5a854.min.smt2'],
   ['solver/abstract/murxla-346218efd24c9aba.min.smt2'],
   ['solver/abstract/murxla-cc7db96bcf2e620d.min.smt2'],
+  ['solver/abstract/murxla-6614bd790e5425d5.min.smt2'],
+  ['solver/abstract/regrconstarray19-abstr.smt2'],
   ['solver/abstract/red-bench-8002.smt2'],
   ['solver/abstract/eagerrefine1.smt2'],
   ['solver/array/adc_const_index.smt2', ['--adc-sat-propagator=true']],

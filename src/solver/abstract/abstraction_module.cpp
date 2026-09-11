@@ -186,6 +186,7 @@ AbstractionModule::process(const Node& term)
       if (abstract(rebuilt))
       {
         it->second = nm.mk_node(Kind::AM_ABSTRACT, {rebuilt});
+        ++d_num_abstractions;
         ++d_stats.num_terms;
         d_stats.terms << rebuilt.kind();
       }
@@ -198,6 +199,56 @@ AbstractionModule::process(const Node& term)
   } while (!visit.empty());
 
   return d_abstraction_cache.at(term);
+}
+
+Node
+AbstractionModule::process_value(const Node& term)
+{
+  NodeManager& nm = d_env.nm();
+
+  // Abstractions created since the last value query invalidate the cache: a
+  // term previously rebuilt as-is may now have to map to its abstraction.
+  if (d_value_cache_num_abstractions != d_num_abstractions)
+  {
+    d_value_cache.clear();
+    d_value_cache_num_abstractions = d_num_abstractions;
+  }
+
+  node_ref_vector visit{term};
+  do
+  {
+    const Node& cur     = visit.back();
+    auto [it, inserted] = d_value_cache.try_emplace(cur);
+    if (inserted)
+    {
+      // Use the abstraction if we already have one, but never create a new
+      // one: a fresh abstraction is unconstrained in the current candidate
+      // model and would yield an arbitrary value.
+      auto ita = d_abstraction_cache.find(cur);
+      if (ita != d_abstraction_cache.end() && !ita->second.is_null())
+      {
+        it->second = ita->second;
+      }
+      else if (cur.kind() == Kind::FORALL || cur.kind() == Kind::AM_ABSTRACT)
+      {
+        it->second = cur;
+      }
+      else
+      {
+        visit.insert(visit.end(), cur.begin(), cur.end());
+        continue;
+      }
+    }
+    else if (it->second.is_null())
+    {
+      it->second =
+          d_env.rewriter().rewrite(utils::rebuild_node(nm, cur, d_value_cache));
+    }
+    visit.pop_back();
+  } while (!visit.empty());
+
+  // Returned by value: the cache is cleared when new abstractions appear.
+  return d_value_cache.at(term);
 }
 
 const Node&

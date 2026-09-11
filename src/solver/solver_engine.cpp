@@ -168,7 +168,7 @@ SolverEngine::value(const Node& term)
   if (d_in_solving_mode)
   {
     // Make sure that term is processed by abstraction module
-    const Node& _term = d_am ? d_am->process(term) : term;
+    Node _term = d_am ? d_am->process_value(term) : term;
     process_term(_term);
     return _value(_term);
   }
@@ -495,6 +495,7 @@ SolverEngine::process_assertion(const Node& assertion,
 {
   Node _assertion =
       d_am ? d_am->process_assertion(assertion, is_lemma) : assertion;
+  assert(d_am == nullptr || d_am->process(_assertion) == _assertion);
 
   // Register terms first, register_assertion() needs their assertion levels.
   process_term(_assertion);
@@ -512,7 +513,6 @@ SolverEngine::process_assertion(const Node& assertion,
 void
 SolverEngine::process_term(const Node& term)
 {
-  assert(d_am == nullptr || d_am->process(term) == term);
   util::Timer timer(d_stats.time_register_term);
   // Make sure that terms are processed by the abstraction module.
   node::node_ref_vector visit{term};
